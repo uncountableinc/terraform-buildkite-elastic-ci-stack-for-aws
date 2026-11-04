@@ -207,6 +207,7 @@ resource "aws_autoscaling_group" "agent_auto_scale_group" {
 
   mixed_instances_policy {
     instances_distribution {
+      on_demand_allocation_strategy            = var.instance_requirements == null ? "prioritized" : "lowest-price"
       on_demand_base_capacity                  = var.on_demand_base_capacity
       on_demand_percentage_above_base_capacity = var.on_demand_percentage
       spot_allocation_strategy                 = var.spot_allocation_strategy
@@ -219,9 +220,37 @@ resource "aws_autoscaling_group" "agent_auto_scale_group" {
       }
 
       dynamic "override" {
-        for_each = split(",", var.instance_types)
+        for_each = var.instance_requirements == null ? split(",", var.instance_types) : []
         content {
           instance_type = trim(override.value, " ")
+        }
+      }
+
+      dynamic "override" {
+        for_each = var.instance_requirements == null ? [] : [var.instance_requirements]
+        content {
+          instance_requirements {
+            cpu_manufacturers                           = override.value.cpu_manufacturers
+            excluded_instance_types                     = override.value.excluded_instance_types
+            spot_max_price_percentage_over_lowest_price = override.value.spot_max_price_percentage_over_lowest_price
+
+            vcpu_count {
+              min = override.value.vcpu_count.min
+              max = override.value.vcpu_count.max
+            }
+
+            memory_mib {
+              min = override.value.memory_mib.min
+              max = override.value.memory_mib.max
+            }
+
+            dynamic "accelerator_count" {
+              for_each = override.value.max_accelerator_count == null ? [] : [override.value.max_accelerator_count]
+              content {
+                max = accelerator_count.value
+              }
+            }
+          }
         }
       }
     }
