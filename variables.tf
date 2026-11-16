@@ -155,6 +155,12 @@ variable "buildkite_agent_enable_graceful_shutdown" {
   default     = false
 }
 
+variable "enable_terminating_lifecycle_hook" {
+  description = "When true, creates the terminating lifecycle hook on the Auto Scaling Group and nothing else of buildkite_agent_enable_graceful_shutdown: no stop-agents Lambda, no Lambda role, and no invocation that scales the group to zero and stops the agents. The hook holds each terminating instance, for up to heartbeat_timeout (1 hour) beyond the last heartbeat, until a process on the instance completes it. Use it with an image whose termination service stops the agents after their jobs and calls autoscaling:RecordLifecycleActionHeartbeat and autoscaling:CompleteLifecycleAction, and an instance role that allows those calls and autoscaling:DescribeLifecycleHooks. Without such a process, every termination waits for the full timeout. Setting both this and buildkite_agent_enable_graceful_shutdown creates one hook."
+  type        = bool
+  default     = false
+}
+
 variable "agents_per_instance" {
   description = "Number of Buildkite agents to start on each EC2 instance. NOTE: If an agent crashes or is terminated, it won't be automatically restarted, leaving fewer active agents on that instance. The scale_in_idle_period parameter controls when the entire instance terminates (when all agents are idle), not individual agent restarts. Consider enabling scaler_enable_elastic_ci_mode for better agent management, or use fewer agents per instance with more instances for high availability."
   type        = number
@@ -284,6 +290,23 @@ variable "instance_creation_timeout" {
   description = "Optional - Timeout period for Auto Scaling Group Creation Policy."
   type        = string
   default     = ""
+}
+
+variable "enable_instance_refresh" {
+  description = "When true, the Auto Scaling Group starts a rolling instance refresh whenever the launch template changes, and replaces scale-in protected instances too. The group then references the launch template's latest version number instead of $Latest, because Terraform sees no change in the $Latest alias and would never start a refresh. Requires the terminating lifecycle hook (enable_terminating_lifecycle_hook or buildkite_agent_enable_graceful_shutdown), because without the hook a refresh terminates instances immediately, in the middle of a job."
+  type        = bool
+  default     = false
+}
+
+variable "instance_refresh_min_healthy_percentage" {
+  description = "Percentage of the Auto Scaling Group capacity that must stay in service during an instance refresh. Only used when enable_instance_refresh is true."
+  type        = number
+  default     = 90
+
+  validation {
+    condition     = var.instance_refresh_min_healthy_percentage >= 0 && var.instance_refresh_min_healthy_percentage <= 100
+    error_message = "instance_refresh_min_healthy_percentage must be between 0 and 100."
+  }
 }
 
 # =============================================================================

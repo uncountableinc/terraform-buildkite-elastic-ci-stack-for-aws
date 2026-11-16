@@ -205,7 +205,7 @@ resource "aws_lambda_invocation" "stop_buildkite_agents_on_replacement" {
 
 # Gives agents time to finish current jobs before termination
 resource "aws_autoscaling_lifecycle_hook" "instance_terminating" {
-  count = local.enable_graceful_shutdown ? 1 : 0
+  count = local.create_terminating_hook ? 1 : 0
 
   name                   = "${local.stack_name_full}-terminating-hook"
   autoscaling_group_name = aws_autoscaling_group.agent_auto_scale_group.name

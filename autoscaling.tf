@@ -216,7 +216,9 @@ resource "aws_autoscaling_group" "agent_auto_scale_group" {
     launch_template {
       launch_template_specification {
         launch_template_id = aws_launch_template.agent_launch_template.id
-        version            = "$Latest"
+        # The $Latest alias never changes in the configuration, so a new launch template version
+        # would not start an instance refresh. With a refresh enabled, track the version number.
+        version = var.enable_instance_refresh ? tostring(aws_launch_template.agent_launch_template.latest_version) : "$Latest"
       }
 
       dynamic "override" {
@@ -266,6 +268,19 @@ resource "aws_autoscaling_group" "agent_auto_scale_group" {
     "ClosestToNextInstanceHour"
   ]
 
+  # Replaces the instances of the group when the launch template version changes. The terminating
+  # lifecycle hook (enable_terminating_lifecycle_hook or buildkite_agent_enable_graceful_shutdown) lets each agent finish its job first.
+  dynamic "instance_refresh" {
+    for_each = var.enable_instance_refresh ? [1] : []
+    content {
+      strategy = "Rolling"
+      preferences {
+        min_healthy_percentage       = var.instance_refresh_min_healthy_percentage
+        scale_in_protected_instances = "Refresh"
+      }
+    }
+  }
+
   enabled_metrics = [
     "GroupMinSize",
     "GroupMaxSize",
@@ -286,6 +301,13 @@ resource "aws_autoscaling_group" "agent_auto_scale_group" {
 
   lifecycle {
     ignore_changes = [suspended_processes]
+
+    # Kept on the group, not in a terraform_data resource, so stacks that leave the refresh off
+    # get no new resource in their plan.
+    precondition {
+      condition     = !var.enable_instance_refresh || local.create_terminating_hook
+      error_message = "enable_instance_refresh requires the terminating lifecycle hook: set enable_terminating_lifecycle_hook or buildkite_agent_enable_graceful_shutdown. Without the hook, an instance refresh terminates instances in the middle of a job."
+    }
   }
 }
 

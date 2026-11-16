@@ -121,6 +121,7 @@ locals {
   use_custom_token_kms     = var.buildkite_agent_token_parameter_store_kms_key != ""
   create_token_parameter   = var.buildkite_agent_token_parameter_store_path == ""
   enable_graceful_shutdown = var.buildkite_agent_enable_graceful_shutdown
+  create_terminating_hook  = local.enable_graceful_shutdown || var.enable_terminating_lifecycle_hook
 
   # KMS key settings for pipeline signature verification
   use_existing_signing_key = var.pipeline_signing_kms_key_id != ""
