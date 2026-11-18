@@ -12,6 +12,16 @@ resource "aws_lambda_function" "az_rebalancing_suspender" {
   filename         = archive_file.az_rebalancing_suspender.output_path
   source_code_hash = archive_file.az_rebalancing_suspender.output_base64sha256
 
+  depends_on = [aws_cloudwatch_log_group.az_rebalancing_suspender_logs]
+
+  tags = local.common_tags
+}
+
+#tfsec:ignore:aws-cloudwatch-log-group-customer-key Using default encryption for CloudWatch Logs; CMK can be added by users if required
+resource "aws_cloudwatch_log_group" "az_rebalancing_suspender_logs" {
+  name              = "/aws/lambda/${local.stack_name_full}-az-rebalancing-suspender"
+  retention_in_days = var.lambda_log_retention_days
+
   tags = local.common_tags
 }
 
@@ -92,6 +102,18 @@ resource "aws_lambda_function" "stop_buildkite_agents" {
 
   filename         = archive_file.stop_buildkite_agents[0].output_path
   source_code_hash = archive_file.stop_buildkite_agents[0].output_base64sha256
+
+  depends_on = [aws_cloudwatch_log_group.stop_buildkite_agents_logs[0]]
+
+  tags = local.common_tags
+}
+
+#tfsec:ignore:aws-cloudwatch-log-group-customer-key Using default encryption for CloudWatch Logs; CMK can be added by users if required
+resource "aws_cloudwatch_log_group" "stop_buildkite_agents_logs" {
+  count = local.enable_graceful_shutdown ? 1 : 0
+
+  name              = "/aws/lambda/${local.stack_name_full}-stop-buildkite-agents"
+  retention_in_days = var.lambda_log_retention_days
 
   tags = local.common_tags
 }
